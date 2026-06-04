@@ -1,4 +1,4 @@
-import { HandoverItem } from '../types';
+import { HandoverItem, HandoverStatus } from '../types';
 
 const STORAGE_KEY = 'duty_handover_items';
 
@@ -47,9 +47,17 @@ export const deleteItem = (id: string): boolean => {
 };
 
 export const completeItem = (id: string, remarks?: string): HandoverItem | null => {
+  const items = getItems();
+  const existingItem = items.find(item => item.id === id);
+  if (!existingItem) return null;
+  
+  const mergedRemarks = [existingItem.remarks, remarks]
+    .filter(Boolean)
+    .join('\n\n');
+  
   return updateItem(id, {
-    status: 'completed' as any,
+    status: HandoverStatus.COMPLETED,
     completedAt: new Date().toISOString(),
-    remarks
+    remarks: mergedRemarks || undefined
   });
 };

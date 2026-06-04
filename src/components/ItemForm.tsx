@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { HandoverItem, HandoverStatus, Priority } from '../types';
-import { getTodayDate } from '../utils/dateUtils';
+import { getTodayDate, toLocalISOString, fromLocalISOString } from '../utils/dateUtils';
 
 interface ItemFormProps {
   item?: HandoverItem | null;
@@ -29,7 +29,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({ item, onSubmit, onCancel }) 
         priority: item.priority,
         assignee: item.assignee,
         reporter: item.reporter,
-        deadline: item.deadline.slice(0, 16),
+        deadline: fromLocalISOString(item.deadline),
         remarks: item.remarks || ''
       });
     }
@@ -39,7 +39,7 @@ export const ItemForm: React.FC<ItemFormProps> = ({ item, onSubmit, onCancel }) 
     e.preventDefault();
     onSubmit({
       ...formData,
-      deadline: new Date(formData.deadline).toISOString()
+      deadline: toLocalISOString(formData.deadline)
     });
   };
 

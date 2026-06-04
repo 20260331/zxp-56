@@ -45,7 +45,9 @@ function App() {
   };
 
   const handleComplete = (id: string) => {
-    completeItem(id);
+    const remarks = window.prompt('请输入完成备注（可选）：');
+    if (remarks === null) return;
+    completeItem(id, remarks || undefined);
     setItems(getItems());
   };
 

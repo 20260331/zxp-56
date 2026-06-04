@@ -67,3 +67,25 @@ export const fromLocalISOString = (isoString: string): string => {
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
+
+export const getCurrentShift = (): 'morning' | 'afternoon' | 'night' => {
+  const hour = new Date().getHours();
+  if (hour >= 8 && hour < 16) return 'morning';
+  if (hour >= 16 && hour < 24) return 'afternoon';
+  return 'night';
+};
+
+export const getShiftLabel = (shiftType: 'morning' | 'afternoon' | 'night'): string => {
+  const labels = {
+    morning: '早班 (08:00-16:00)',
+    afternoon: '中班 (16:00-24:00)',
+    night: '晚班 (00:00-08:00)'
+  };
+  return labels[shiftType];
+};
+
+export const isSameDay = (dateStr1: string, dateStr2: string): boolean => {
+  const d1 = new Date(dateStr1);
+  const d2 = new Date(dateStr2);
+  return d1.toDateString() === d2.toDateString();
+};

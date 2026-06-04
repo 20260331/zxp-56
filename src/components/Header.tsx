@@ -2,9 +2,11 @@ import React from 'react';
 
 interface HeaderProps {
   onAddItem: () => void;
+  onHandover: () => void;
+  onViewHistory: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onAddItem }) => {
+export const Header: React.FC<HeaderProps> = ({ onAddItem, onHandover, onViewHistory }) => {
   const now = new Date();
   const dateStr = now.toLocaleDateString('zh-CN', {
     year: 'numeric',
@@ -24,13 +26,29 @@ export const Header: React.FC<HeaderProps> = ({ onAddItem }) => {
             </h1>
             <p className="text-blue-100 mt-1">{dateStr}</p>
           </div>
-          <button
-            onClick={onAddItem}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-blue-600 font-semibold rounded-lg shadow-md hover:shadow-lg hover:bg-blue-50 transition-all duration-200"
-          >
-            <span className="text-xl">+</span>
-            新增交接事项
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={onHandover}
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-green-500 text-white font-semibold rounded-lg shadow-md hover:shadow-lg hover:bg-green-600 transition-all duration-200"
+            >
+              <span>🤝</span>
+              交班
+            </button>
+            <button
+              onClick={onViewHistory}
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-white bg-opacity-20 text-white font-semibold rounded-lg hover:bg-opacity-30 transition-all duration-200"
+            >
+              <span>📚</span>
+              历史
+            </button>
+            <button
+              onClick={onAddItem}
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-white text-blue-600 font-semibold rounded-lg shadow-md hover:shadow-lg hover:bg-blue-50 transition-all duration-200"
+            >
+              <span className="text-xl">+</span>
+              新增交接事项
+            </button>
+          </div>
         </div>
       </div>
     </header>

@@ -35,4 +35,27 @@ export interface DutyShift {
   handoverTime: string;
 }
 
+export interface ShiftReportItem {
+  id: string;
+  title: string;
+  description: string;
+  priority: Priority;
+  assignee: string;
+  deadline: string;
+}
+
+export interface ShiftReport {
+  id: string;
+  date: string;
+  shiftType: 'morning' | 'afternoon' | 'night';
+  operator: string;
+  handoverTime: string;
+  nextOperator: string;
+  summary: string;
+  newItems: ShiftReportItem[];
+  completedItems: ShiftReportItem[];
+  pendingItems: ShiftReportItem[];
+  createdAt: string;
+}
+
 export type FilterType = 'all' | 'today' | 'overdue' | 'pending' | 'completed';

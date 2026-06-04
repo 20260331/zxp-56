@@ -4,23 +4,82 @@ import { StatsPanel } from './components/StatsPanel';
 import { FilterBar } from './components/FilterBar';
 import { ItemCard } from './components/ItemCard';
 import { ItemForm } from './components/ItemForm';
-import { HandoverItem, FilterType } from './types';
-import { getItems, addItem, updateItem, deleteItem, completeItem } from './utils/storage';
+import { ShiftReportModal } from './components/ShiftReportModal';
+import { ShiftReportHistory } from './components/ShiftReportHistory';
+import { ShiftReportDetail } from './components/ShiftReportDetail';
+import { HandoverItem, FilterType, ShiftReport, ShiftReportItem } from './types';
+import { getItems, addItem, updateItem, deleteItem, completeItem, getReports, addReport, deleteReport } from './utils/storage';
 import { isToday, isOverdue } from './utils/dateUtils';
 
 function App() {
   const [items, setItems] = useState<HandoverItem[]>([]);
+  const [reports, setReports] = useState<ShiftReport[]>([]);
   const [currentFilter, setCurrentFilter] = useState<FilterType>('all');
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<HandoverItem | null>(null);
+  const [showShiftReport, setShowShiftReport] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [viewingReport, setViewingReport] = useState<ShiftReport | null>(null);
 
   useEffect(() => {
     setItems(getItems());
+    setReports(getReports());
   }, []);
+
+  const refreshData = () => {
+    setItems(getItems());
+    setReports(getReports());
+  };
 
   const handleAddItem = () => {
     setEditingItem(null);
     setShowForm(true);
+  };
+
+  const handleHandover = () => {
+    setShowShiftReport(true);
+  };
+
+  const handleViewHistory = () => {
+    setShowHistory(true);
+  };
+
+  const handleReportSubmit = (data: {
+    date: string;
+    shiftType: 'morning' | 'afternoon' | 'night';
+    operator: string;
+    handoverTime: string;
+    nextOperator: string;
+    summary: string;
+    newItems: ShiftReportItem[];
+    completedItems: ShiftReportItem[];
+    pendingItems: ShiftReportItem[];
+  }) => {
+    addReport(data);
+    refreshData();
+    setShowShiftReport(false);
+    alert('交班报生成成功！');
+  };
+
+  const handleReportCancel = () => {
+    setShowShiftReport(false);
+  };
+
+  const handleViewReportDetail = (report: ShiftReport) => {
+    setViewingReport(report);
+  };
+
+  const handleCloseReportDetail = () => {
+    setViewingReport(null);
+  };
+
+  const handleDeleteReport = (id: string) => {
+    deleteReport(id);
+    refreshData();
+  };
+
+  const handleCloseHistory = () => {
+    setShowHistory(false);
   };
 
   const handleEditItem = (item: HandoverItem) => {
@@ -34,7 +93,7 @@ function App() {
     } else {
       addItem(data);
     }
-    setItems(getItems());
+    refreshData();
     setShowForm(false);
     setEditingItem(null);
   };
@@ -48,13 +107,13 @@ function App() {
     const remarks = window.prompt('请输入完成备注（可选）：');
     if (remarks === null) return;
     completeItem(id, remarks || undefined);
-    setItems(getItems());
+    refreshData();
   };
 
   const handleDelete = (id: string) => {
     if (window.confirm('确定要删除这个交接事项吗？')) {
       deleteItem(id);
-      setItems(getItems());
+      refreshData();
     }
   };
 
@@ -99,7 +158,11 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header onAddItem={handleAddItem} />
+      <Header 
+        onAddItem={handleAddItem} 
+        onHandover={handleHandover}
+        onViewHistory={handleViewHistory}
+      />
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <section className="mb-8">
@@ -145,6 +208,30 @@ function App() {
           item={editingItem}
           onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
+        />
+      )}
+
+      {showShiftReport && (
+        <ShiftReportModal
+          items={items}
+          onSubmit={handleReportSubmit}
+          onCancel={handleReportCancel}
+        />
+      )}
+
+      {showHistory && (
+        <ShiftReportHistory
+          reports={reports}
+          onViewDetail={handleViewReportDetail}
+          onDelete={handleDeleteReport}
+          onClose={handleCloseHistory}
+        />
+      )}
+
+      {viewingReport && (
+        <ShiftReportDetail
+          report={viewingReport}
+          onClose={handleCloseReportDetail}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
-import { HandoverItem, HandoverStatus } from '../types';
+import { HandoverItem, HandoverStatus, ShiftReport, ShiftReportItem } from '../types';
 
 const STORAGE_KEY = 'duty_handover_items';
+const REPORTS_STORAGE_KEY = 'duty_shift_reports';
 
 export const getItems = (): HandoverItem[] => {
   const data = localStorage.getItem(STORAGE_KEY);
@@ -61,3 +62,46 @@ export const completeItem = (id: string, remarks?: string): HandoverItem | null 
     remarks: mergedRemarks || undefined
   });
 };
+
+export const getReports = (): ShiftReport[] => {
+  const data = localStorage.getItem(REPORTS_STORAGE_KEY);
+  return data ? JSON.parse(data) : [];
+};
+
+export const saveReports = (reports: ShiftReport[]): void => {
+  localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports));
+};
+
+export const addReport = (report: Omit<ShiftReport, 'id' | 'createdAt'>): ShiftReport => {
+  const reports = getReports();
+  const newReport: ShiftReport = {
+    ...report,
+    id: Date.now().toString(),
+    createdAt: new Date().toISOString()
+  };
+  reports.unshift(newReport);
+  saveReports(reports);
+  return newReport;
+};
+
+export const getReportById = (id: string): ShiftReport | null => {
+  const reports = getReports();
+  return reports.find(report => report.id === id) || null;
+};
+
+export const deleteReport = (id: string): boolean => {
+  const reports = getReports();
+  const filtered = reports.filter(report => report.id !== id);
+  if (filtered.length === reports.length) return false;
+  saveReports(filtered);
+  return true;
+};
+
+export const convertToReportItem = (item: HandoverItem): ShiftReportItem => ({
+  id: item.id,
+  title: item.title,
+  description: item.description,
+  priority: item.priority,
+  assignee: item.assignee,
+  deadline: item.deadline
+});

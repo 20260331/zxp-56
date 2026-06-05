@@ -8,7 +8,7 @@ import { ShiftReportModal } from './components/ShiftReportModal';
 import { ShiftReportHistory } from './components/ShiftReportHistory';
 import { ShiftReportDetail } from './components/ShiftReportDetail';
 import { HandoverItem, FilterType, ShiftReport, ShiftReportItem } from './types';
-import { getItems, addItem, updateItem, deleteItem, completeItem, getReports, addReport, deleteReport } from './utils/storage';
+import { getItems, addItem, updateItem, deleteItem, completeItem, getReports, addReport, deleteReport, confirmReport, ensureReportReceiptFields, getReportById } from './utils/storage';
 import { isToday, isOverdue } from './utils/dateUtils';
 
 function App() {
@@ -22,6 +22,7 @@ function App() {
   const [viewingReport, setViewingReport] = useState<ShiftReport | null>(null);
 
   useEffect(() => {
+    ensureReportReceiptFields();
     setItems(getItems());
     setReports(getReports());
   }, []);
@@ -76,6 +77,14 @@ function App() {
   const handleDeleteReport = (id: string) => {
     deleteReport(id);
     refreshData();
+  };
+
+  const handleConfirmReport = (id: string, receivedBy: string) => {
+    confirmReport(id, receivedBy);
+    refreshData();
+    if (viewingReport && viewingReport.id === id) {
+      setViewingReport(getReportById(id));
+    }
   };
 
   const handleCloseHistory = () => {
@@ -224,6 +233,7 @@ function App() {
           reports={reports}
           onViewDetail={handleViewReportDetail}
           onDelete={handleDeleteReport}
+          onConfirm={handleConfirmReport}
           onClose={handleCloseHistory}
         />
       )}
@@ -231,6 +241,7 @@ function App() {
       {viewingReport && (
         <ShiftReportDetail
           report={viewingReport}
+          onConfirm={handleConfirmReport}
           onClose={handleCloseReportDetail}
         />
       )}

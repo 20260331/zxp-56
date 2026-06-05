@@ -44,6 +44,11 @@ export interface ShiftReportItem {
   deadline: string;
 }
 
+export enum ReportReceiptStatus {
+  PENDING = 'pending',
+  RECEIVED = 'received'
+}
+
 export interface ShiftReport {
   id: string;
   date: string;
@@ -56,6 +61,9 @@ export interface ShiftReport {
   completedItems: ShiftReportItem[];
   pendingItems: ShiftReportItem[];
   createdAt: string;
+  receiptStatus: ReportReceiptStatus;
+  receivedBy?: string;
+  receivedAt?: string;
 }
 
 export type FilterType = 'all' | 'today' | 'overdue' | 'pending' | 'completed';

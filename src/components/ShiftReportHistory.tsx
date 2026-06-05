@@ -1,11 +1,12 @@
-import React from 'react';
-import { ShiftReport } from '../types';
+import React, { useState } from 'react';
+import { ShiftReport, ReportReceiptStatus } from '../types';
 import { getShiftLabel, formatDate } from '../utils/dateUtils';
 
 interface ShiftReportHistoryProps {
   reports: ShiftReport[];
   onViewDetail: (report: ShiftReport) => void;
   onDelete: (id: string) => void;
+  onConfirm: (id: string, receivedBy: string) => void;
   onClose: () => void;
 }
 
@@ -13,12 +14,31 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
   reports, 
   onViewDetail, 
   onDelete,
+  onConfirm,
   onClose 
 }) => {
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [receiverName, setReceiverName] = useState('');
+
   const shiftColors: Record<string, string> = {
     morning: 'bg-yellow-100 text-yellow-700 border-yellow-300',
     afternoon: 'bg-blue-100 text-blue-700 border-blue-300',
     night: 'bg-purple-100 text-purple-700 border-purple-300'
+  };
+
+  const getReceiptBadge = (report: ShiftReport) => {
+    if (report.receiptStatus === ReportReceiptStatus.RECEIVED) {
+      return (
+        <span className="px-2 py-0.5 text-xs font-medium rounded border bg-green-100 text-green-700 border-green-300">
+          ✓ 已接收
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-0.5 text-xs font-medium rounded border bg-orange-100 text-orange-700 border-orange-300">
+        ⏳ 待接收
+      </span>
+    );
   };
 
   return (
@@ -55,9 +75,12 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
                     <div className="flex items-center gap-3">
                       <div className="text-3xl">📋</div>
                       <div>
-                        <h3 className="font-semibold text-gray-800 text-lg">
-                          {report.date} 交班报
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-gray-800 text-lg">
+                            {report.date} 交班报
+                          </h3>
+                          {getReceiptBadge(report)}
+                        </div>
                         <div className="flex items-center gap-3 mt-1">
                           <span className={`px-2 py-0.5 text-xs font-medium rounded border ${shiftColors[report.shiftType]}`}>
                             {getShiftLabel(report.shiftType)}
@@ -66,6 +89,11 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
                             交班人: {report.operator} → 接班人: {report.nextOperator}
                           </span>
                         </div>
+                        {report.receiptStatus === ReportReceiptStatus.RECEIVED && report.receivedAt && (
+                          <div className="text-xs text-green-600 mt-1">
+                            接收人: {report.receivedBy} · {formatDate(report.receivedAt)}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <span className="text-xs text-gray-400">
@@ -106,6 +134,17 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
                     >
                       查看详情
                     </button>
+                    {report.receiptStatus !== ReportReceiptStatus.RECEIVED && (
+                      <button
+                        onClick={() => {
+                          setConfirmingId(report.id);
+                          setReceiverName(report.nextOperator);
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors"
+                      >
+                        确认接收
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         if (window.confirm('确定要删除这份交班报吗？')) {
@@ -123,6 +162,56 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
           )}
         </div>
       </div>
+
+      {confirmingId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-800">确认交接</h3>
+            </div>
+            <div className="p-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                接收人姓名 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={receiverName}
+                onChange={(e) => setReceiverName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                placeholder="请输入接收人姓名"
+                autoFocus
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                确认后将标记该交班报为已接收，并记录接收时间。
+              </p>
+            </div>
+            <div className="p-6 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={() => {
+                  setConfirmingId(null);
+                  setReceiverName('');
+                }}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  if (receiverName.trim()) {
+                    onConfirm(confirmingId, receiverName.trim());
+                    setConfirmingId(null);
+                    setReceiverName('');
+                  }
+                }}
+                className="flex-1 px-4 py-2 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!receiverName.trim()}
+              >
+                确认接收
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

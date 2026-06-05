@@ -1,4 +1,4 @@
-import { HandoverItem, HandoverStatus, ShiftReport, ShiftReportItem } from '../types';
+import { HandoverItem, HandoverStatus, ShiftReport, ShiftReportItem, ReportReceiptStatus } from '../types';
 
 const STORAGE_KEY = 'duty_handover_items';
 const REPORTS_STORAGE_KEY = 'duty_shift_reports';
@@ -72,12 +72,13 @@ export const saveReports = (reports: ShiftReport[]): void => {
   localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports));
 };
 
-export const addReport = (report: Omit<ShiftReport, 'id' | 'createdAt'>): ShiftReport => {
+export const addReport = (report: Omit<ShiftReport, 'id' | 'createdAt' | 'receiptStatus'>): ShiftReport => {
   const reports = getReports();
   const newReport: ShiftReport = {
     ...report,
     id: Date.now().toString(),
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    receiptStatus: ReportReceiptStatus.PENDING
   };
   reports.unshift(newReport);
   saveReports(reports);
@@ -95,6 +96,39 @@ export const deleteReport = (id: string): boolean => {
   if (filtered.length === reports.length) return false;
   saveReports(filtered);
   return true;
+};
+
+export const confirmReport = (id: string, receivedBy: string): ShiftReport | null => {
+  const reports = getReports();
+  const index = reports.findIndex(report => report.id === id);
+  if (index === -1) return null;
+
+  reports[index] = {
+    ...reports[index],
+    receiptStatus: ReportReceiptStatus.RECEIVED,
+    receivedBy,
+    receivedAt: new Date().toISOString()
+  };
+  saveReports(reports);
+  return reports[index];
+};
+
+export const ensureReportReceiptFields = (): void => {
+  const reports = getReports();
+  let updated = false;
+  const migrated = reports.map(report => {
+    if (!report.receiptStatus) {
+      updated = true;
+      return {
+        ...report,
+        receiptStatus: ReportReceiptStatus.PENDING
+      };
+    }
+    return report;
+  });
+  if (updated) {
+    saveReports(migrated);
+  }
 };
 
 export const convertToReportItem = (item: HandoverItem): ShiftReportItem => ({

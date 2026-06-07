@@ -262,6 +262,7 @@ function App() {
       {showHistory && (
         <ShiftReportHistory
           reports={reports}
+          items={items}
           onViewDetail={handleViewReportDetail}
           onDelete={handleDeleteReport}
           onConfirm={handleConfirmReport}
@@ -272,6 +273,7 @@ function App() {
       {viewingReport && (
         <ShiftReportDetail
           report={viewingReport}
+          items={items}
           onConfirm={handleConfirmReport}
           onClose={handleCloseReportDetail}
         />

@@ -8,7 +8,7 @@ import { ShiftReportModal } from './components/ShiftReportModal';
 import { ShiftReportHistory } from './components/ShiftReportHistory';
 import { ShiftReportDetail } from './components/ShiftReportDetail';
 import { HandoverItem, FilterType, ShiftReport, ShiftReportItem, RiskStatus, RiskLevel } from './types';
-import { getItems, addItem, updateItem, deleteItem, completeItem, getReports, addReport, deleteReport, confirmReport, ensureAllMigrations, getReportById, resolveRisk } from './utils/storage';
+import { getItems, addItem, updateItem, deleteItem, completeItem, getReports, addReport, deleteReport, confirmReport, ensureAllMigrations, getReportById, resolveRisk, saveRiskFeedback } from './utils/storage';
 import { isToday, isOverdue } from './utils/dateUtils';
 
 function App() {
@@ -86,6 +86,14 @@ function App() {
     refreshData();
     if (viewingReport && viewingReport.id === id) {
       setViewingReport(getReportById(id));
+    }
+  };
+
+  const handleRiskFeedback = (reportId: string, itemId: string, feedback: string, feedbackBy: string) => {
+    saveRiskFeedback(reportId, itemId, feedback, feedbackBy);
+    refreshData();
+    if (viewingReport && viewingReport.id === reportId) {
+      setViewingReport(getReportById(reportId));
     }
   };
 
@@ -266,6 +274,7 @@ function App() {
           onViewDetail={handleViewReportDetail}
           onDelete={handleDeleteReport}
           onConfirm={handleConfirmReport}
+          onRiskFeedback={handleRiskFeedback}
           onClose={handleCloseHistory}
         />
       )}
@@ -275,6 +284,7 @@ function App() {
           report={viewingReport}
           items={items}
           onConfirm={handleConfirmReport}
+          onRiskFeedback={handleRiskFeedback}
           onClose={handleCloseReportDetail}
         />
       )}

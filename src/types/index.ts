@@ -64,6 +64,9 @@ export interface ShiftReportItem {
   riskLevel: RiskLevel;
   riskStatus: RiskStatus;
   followUpPlan?: string;
+  riskFeedback?: string;
+  riskFeedbackBy?: string;
+  riskFeedbackAt?: string;
 }
 
 export enum ReportReceiptStatus {

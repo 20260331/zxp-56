@@ -6,12 +6,16 @@ interface ShiftReportDetailProps {
   report: ShiftReport;
   items: HandoverItem[];
   onConfirm: (id: string, receivedBy: string) => void;
+  onRiskFeedback: (reportId: string, itemId: string, feedback: string, feedbackBy: string) => void;
   onClose: () => void;
 }
 
-export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, items, onConfirm, onClose }) => {
+export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, items, onConfirm, onRiskFeedback, onClose }) => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [receiverName, setReceiverName] = useState(report.nextOperator);
+  const [feedbackInputs, setFeedbackInputs] = useState<Record<string, string>>({});
+  const [feedbackByInputs, setFeedbackByInputs] = useState<Record<string, string>>({});
+  const [submittingItemId, setSubmittingItemId] = useState<string | null>(null);
 
   const priorityColors: Record<string, string> = {
     low: 'bg-gray-100 text-gray-600',
@@ -52,24 +56,28 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, it
   const riskInfo = useMemo(() => {
     const snapshotRiskCount = report.riskItems?.length || 0;
     if (snapshotRiskCount === 0) {
-      return { snapshotRiskCount, stillOpenCount: 0, allResolved: true, hasAnyRisk: false };
+      return { snapshotRiskCount, stillOpenCount: 0, allResolved: true, hasAnyRisk: false, feedbackCount: 0, pendingFeedbackCount: 0 };
     }
     let stillOpenCount = 0;
+    let feedbackCount = 0;
     (report.riskItems || []).forEach(riskItem => {
       const liveItem = itemMap.get(riskItem.id);
       if (!liveItem) {
         stillOpenCount++;
-        return;
-      }
-      if (liveItem.isRisk && liveItem.riskStatus === RiskStatus.OPEN) {
+      } else if (liveItem.isRisk && liveItem.riskStatus === RiskStatus.OPEN) {
         stillOpenCount++;
+      }
+      if (riskItem.riskFeedback && riskItem.riskFeedback.trim()) {
+        feedbackCount++;
       }
     });
     return { 
       snapshotRiskCount, 
       stillOpenCount, 
       allResolved: stillOpenCount === 0,
-      hasAnyRisk: true
+      hasAnyRisk: true,
+      feedbackCount,
+      pendingFeedbackCount: snapshotRiskCount - feedbackCount
     };
   }, [report, itemMap]);
 
@@ -82,15 +90,189 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, it
       const isStillOpen = liveItem 
         ? liveItem.isRisk && liveItem.riskStatus === RiskStatus.OPEN
         : snapshotItem.riskStatus === RiskStatus.OPEN;
-      return { ...snapshotItem, isStillOpen };
+      const hasFeedback = !!(snapshotItem.riskFeedback && snapshotItem.riskFeedback.trim());
+      return { ...snapshotItem, isStillOpen, hasFeedback };
     });
   };
 
   const riskItemsWithLiveStatus = getRiskItemsWithLiveStatus();
 
+  const handleSubmitFeedback = (itemId: string) => {
+    const feedback = feedbackInputs[itemId] || '';
+    const feedbackBy = feedbackByInputs[itemId] || report.nextOperator;
+    if (!feedback.trim()) return;
+    if (!feedbackBy.trim()) return;
+    setSubmittingItemId(itemId);
+    onRiskFeedback(report.id, itemId, feedback.trim(), feedbackBy.trim());
+    setFeedbackInputs(prev => {
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
+    setFeedbackByInputs(prev => {
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
+    setTimeout(() => setSubmittingItemId(null), 300);
+  };
+
+  const RiskItemSection = ({ title, items, color, icon }: {
+    title: string;
+    items: (ShiftReportItem & { isStillOpen?: boolean; hasFeedback?: boolean })[];
+    color: string;
+    icon: string;
+  }) => (
+    <div className="mb-6">
+      <div className={`flex items-center gap-2 mb-3 p-3 rounded-lg ${color}`}>
+        <span className="text-lg">{icon}</span>
+        <span className="font-semibold">{title}</span>
+        <span className="ml-auto bg-white bg-opacity-60 px-3 py-1 rounded-full text-sm font-medium">
+          共 {items.length} 项
+        </span>
+        {riskInfo.hasAnyRisk && (
+          <span className="bg-white bg-opacity-80 px-3 py-1 rounded-full text-sm font-medium text-indigo-700">
+            已反馈 {riskInfo.feedbackCount} / 未反馈 {riskInfo.pendingFeedbackCount}
+          </span>
+        )}
+      </div>
+      {items.length === 0 ? (
+        <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+          <p className="text-gray-400">暂无事项</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {items.map((item, index) => (
+            <div 
+              key={item.id} 
+              className={`p-4 rounded-lg border hover:shadow-sm transition-shadow ${
+                item.isStillOpen 
+                  ? 'bg-red-50 border-red-200' 
+                  : 'bg-teal-50 border-teal-200'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium text-gray-500">
+                  {index + 1}
+                </span>
+                <div className="flex-1">
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-medium text-gray-800">{item.title}</h4>
+                      {item.isRisk && (
+                        <span className={`px-2 py-0.5 text-xs rounded whitespace-nowrap ${riskLevelColors[item.riskLevel]}`}>
+                          风险:{riskLevelLabels[item.riskLevel]}
+                        </span>
+                      )}
+                      <span className={`px-2 py-0.5 text-xs rounded whitespace-nowrap font-medium ${
+                        item.isStillOpen
+                          ? 'bg-red-500 text-white'
+                          : 'bg-teal-500 text-white'
+                      }`}>
+                        {item.isStillOpen ? '🔴 仍未解除' : '🟢 已解除'}
+                      </span>
+                      {item.hasFeedback ? (
+                        <span className="px-2 py-0.5 text-xs rounded whitespace-nowrap font-medium bg-indigo-500 text-white">
+                          ✓ 已反馈
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 text-xs rounded whitespace-nowrap font-medium bg-amber-500 text-white">
+                          ⏳ 未反馈
+                        </span>
+                      )}
+                    </div>
+                    <span className={`px-2 py-0.5 text-xs rounded whitespace-nowrap ${priorityColors[item.priority]}`}>
+                      {priorityLabels[item.priority]}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">{item.description}</p>
+                  {item.followUpPlan && (
+                    <div className="mt-2 p-2 bg-amber-50 rounded border border-amber-200">
+                      <p className="text-xs text-amber-800">
+                        <span className="font-semibold">📋 跟进计划:</span> {item.followUpPlan}
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex gap-4 mt-3 text-xs text-gray-400">
+                    <span className="flex items-center gap-1">
+                      <span>👤</span>
+                      责任人: {item.assignee}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span>⏰</span>
+                      截止: {formatDate(item.deadline)}
+                    </span>
+                  </div>
+
+                  {item.hasFeedback && item.riskFeedback && (
+                    <div className="mt-3 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                      <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                        <span className="text-xs font-semibold text-indigo-800 flex items-center gap-1">
+                          <span>💬</span>
+                          接班人处理意见（已反馈）
+                        </span>
+                        <span className="text-xs text-indigo-500">
+                          {item.riskFeedbackBy && <>反馈人: {item.riskFeedbackBy} · </>}
+                          {item.riskFeedbackAt && formatDate(item.riskFeedbackAt)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-indigo-700 whitespace-pre-wrap leading-relaxed">
+                        {item.riskFeedback}
+                      </p>
+                    </div>
+                  )}
+
+                  {!item.hasFeedback && (
+                    <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                      <div className="flex items-center gap-1 mb-2">
+                        <span className="text-xs font-semibold text-amber-800 flex items-center gap-1">
+                          <span>✏️</span>
+                          填写处理意见（未反馈）
+                        </span>
+                      </div>
+                      <label className="block text-xs font-medium text-amber-700 mb-1">
+                        反馈人
+                      </label>
+                      <input
+                        type="text"
+                        value={feedbackByInputs[item.id] ?? report.nextOperator}
+                        onChange={(e) => setFeedbackByInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
+                        className="w-full px-3 py-1.5 mb-2 text-sm border border-amber-300 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white"
+                        placeholder="请输入反馈人姓名"
+                      />
+                      <label className="block text-xs font-medium text-amber-700 mb-1">
+                        处理意见 <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={feedbackInputs[item.id] ?? ''}
+                        onChange={(e) => setFeedbackInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
+                        className="w-full px-3 py-2 text-sm border border-amber-300 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none bg-white"
+                        rows={3}
+                        placeholder="请输入针对此风险的处理意见、应对措施等..."
+                      />
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          onClick={() => handleSubmitFeedback(item.id)}
+                          disabled={!feedbackInputs[item.id]?.trim() || !feedbackByInputs[item.id]?.trim() || submittingItemId === item.id}
+                          className="px-4 py-1.5 text-xs font-medium text-white bg-indigo-500 hover:bg-indigo-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {submittingItemId === item.id ? '提交中...' : '提交反馈'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   const ItemSection = ({ title, items, color, icon, showRiskInfo = false, showLiveStatus = false }: {
     title: string;
-    items: (ShiftReportItem & { isStillOpen?: boolean })[];
+    items: (ShiftReportItem & { isStillOpen?: boolean; hasFeedback?: boolean })[];
     color: string;
     icon: string;
     showRiskInfo?: boolean;
@@ -204,6 +386,16 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, it
                   ⏳ 待接收
                 </span>
               )}
+              {riskInfo.hasAnyRisk && riskInfo.pendingFeedbackCount > 0 && (
+                <span className="px-2 py-0.5 text-xs font-bold rounded border bg-white text-amber-600 border-amber-300 animate-pulse">
+                  ⏳ {riskInfo.pendingFeedbackCount} 项风险待反馈
+                </span>
+              )}
+              {riskInfo.hasAnyRisk && riskInfo.pendingFeedbackCount === 0 && riskInfo.feedbackCount > 0 && (
+                <span className="px-2 py-0.5 text-xs font-medium rounded border bg-white text-indigo-700 border-indigo-300">
+                  ✓ {riskInfo.feedbackCount} 项风险已全部反馈
+                </span>
+              )}
               {stillOpen && (
                 <span className="px-2 py-0.5 text-xs font-bold rounded border bg-white text-red-600 border-red-300 animate-pulse">
                   ⚠️ {riskInfo.stillOpenCount} 项风险仍未解除
@@ -273,7 +465,7 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, it
             )}
           </div>
 
-          <div className={`grid gap-4 mb-6 ${riskInfo.hasAnyRisk ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          <div className={`grid gap-4 mb-6 ${riskInfo.hasAnyRisk ? 'grid-cols-5' : 'grid-cols-3'}`}>
             {riskInfo.hasAnyRisk && (
               <div className={`rounded-xl p-4 text-center border ${
                 stillOpen 
@@ -290,6 +482,25 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, it
                   stillOpen ? 'text-red-600' : 'text-teal-600'
                 }`}>
                   仍未解除 / 交班时风险
+                </div>
+              </div>
+            )}
+            {riskInfo.hasAnyRisk && (
+              <div className={`rounded-xl p-4 text-center border ${
+                riskInfo.pendingFeedbackCount > 0
+                  ? 'bg-amber-50 border-amber-200'
+                  : 'bg-indigo-50 border-indigo-200'
+              }`}>
+                <div className={`text-3xl font-bold ${
+                  riskInfo.pendingFeedbackCount > 0 ? 'text-amber-600' : 'text-indigo-600'
+                }`}>
+                  {riskInfo.feedbackCount}
+                  <span className="text-sm font-normal text-gray-500 ml-1">/{riskInfo.snapshotRiskCount}</span>
+                </div>
+                <div className={`text-sm font-medium mt-1 ${
+                  riskInfo.pendingFeedbackCount > 0 ? 'text-amber-600' : 'text-indigo-600'
+                }`}>
+                  已反馈 / 风险总数
                 </div>
               </div>
             )}
@@ -322,13 +533,11 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, it
           </div>
 
           {riskItemsWithLiveStatus.length > 0 && (
-            <ItemSection
+            <RiskItemSection
               title={stillOpen ? '⚠️ 交班时风险事项（仍有未解除）' : '✓ 交班时风险事项（已全部解除）'}
               items={riskItemsWithLiveStatus}
               color={stillOpen ? 'bg-red-100 text-red-700' : 'bg-teal-100 text-teal-700'}
               icon="⚠️"
-              showRiskInfo={true}
-              showLiveStatus={true}
             />
           )}
 

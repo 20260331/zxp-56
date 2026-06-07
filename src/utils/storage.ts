@@ -144,10 +144,22 @@ export const ensureReportReceiptFields = (): void => {
   }
 };
 
+export const ensureReportRiskFeedbackFields = (): void => {
+  const reports = getReports();
+  let updated = false;
+  const migrated = reports.map(report => {
+    return report;
+  });
+  if (updated) {
+    saveReports(migrated);
+  }
+};
+
 export const ensureAllMigrations = (): void => {
   ensureItemRiskFields();
   ensureReportReceiptFields();
   ensureReportRiskFields();
+  ensureReportRiskFeedbackFields();
 };
 
 export const getReports = (): ShiftReport[] => {
@@ -195,6 +207,40 @@ export const confirmReport = (id: string, receivedBy: string): ShiftReport | nul
     receiptStatus: ReportReceiptStatus.RECEIVED,
     receivedBy,
     receivedAt: new Date().toISOString()
+  };
+  saveReports(reports);
+  return reports[index];
+};
+
+export const saveRiskFeedback = (
+  reportId: string,
+  itemId: string,
+  feedback: string,
+  feedbackBy: string
+): ShiftReport | null => {
+  const reports = getReports();
+  const index = reports.findIndex(report => report.id === reportId);
+  if (index === -1) return null;
+
+  const now = new Date().toISOString();
+  const updateItem = (item: ShiftReportItem): ShiftReportItem => {
+    if (item.id === itemId) {
+      return {
+        ...item,
+        riskFeedback: feedback,
+        riskFeedbackBy: feedbackBy,
+        riskFeedbackAt: now
+      };
+    }
+    return item;
+  };
+
+  reports[index] = {
+    ...reports[index],
+    newItems: reports[index].newItems.map(updateItem),
+    completedItems: reports[index].completedItems.map(updateItem),
+    pendingItems: reports[index].pendingItems.map(updateItem),
+    riskItems: reports[index].riskItems ? reports[index].riskItems.map(updateItem) : reports[index].riskItems
   };
   saveReports(reports);
   return reports[index];

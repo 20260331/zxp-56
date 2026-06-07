@@ -12,6 +12,19 @@ export enum Priority {
   URGENT = 'urgent'
 }
 
+export enum RiskLevel {
+  NONE = 'none',
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  CRITICAL = 'critical'
+}
+
+export enum RiskStatus {
+  OPEN = 'open',
+  RESOLVED = 'resolved'
+}
+
 export interface HandoverItem {
   id: string;
   title: string;
@@ -25,6 +38,11 @@ export interface HandoverItem {
   updatedAt: string;
   completedAt?: string;
   remarks?: string;
+  isRisk: boolean;
+  riskLevel: RiskLevel;
+  riskStatus: RiskStatus;
+  followUpPlan?: string;
+  riskResolvedAt?: string;
 }
 
 export interface DutyShift {
@@ -42,6 +60,10 @@ export interface ShiftReportItem {
   priority: Priority;
   assignee: string;
   deadline: string;
+  isRisk: boolean;
+  riskLevel: RiskLevel;
+  riskStatus: RiskStatus;
+  followUpPlan?: string;
 }
 
 export enum ReportReceiptStatus {
@@ -60,10 +82,12 @@ export interface ShiftReport {
   newItems: ShiftReportItem[];
   completedItems: ShiftReportItem[];
   pendingItems: ShiftReportItem[];
+  riskItems: ShiftReportItem[];
   createdAt: string;
   receiptStatus: ReportReceiptStatus;
   receivedBy?: string;
   receivedAt?: string;
+  hasUnresolvedRisk: boolean;
 }
 
 export type FilterType = 'all' | 'today' | 'overdue' | 'pending' | 'completed';

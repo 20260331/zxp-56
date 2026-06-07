@@ -26,11 +26,28 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, on
     urgent: '紧急'
   };
 
-  const ItemSection = ({ title, items, color, icon }: {
+  const riskLevelLabels: Record<string, string> = {
+    none: '无',
+    low: '低',
+    medium: '中',
+    high: '高',
+    critical: '严重'
+  };
+
+  const riskLevelColors: Record<string, string> = {
+    none: 'bg-gray-100 text-gray-600',
+    low: 'bg-yellow-100 text-yellow-700',
+    medium: 'bg-orange-100 text-orange-700',
+    high: 'bg-red-100 text-red-700',
+    critical: 'bg-red-600 text-white'
+  };
+
+  const ItemSection = ({ title, items, color, icon, showRiskInfo = false }: {
     title: string;
     items: ShiftReportItem[];
     color: string;
     icon: string;
+    showRiskInfo?: boolean;
   }) => (
     <div className="mb-6">
       <div className={`flex items-center gap-2 mb-3 p-3 rounded-lg ${color}`}>
@@ -53,13 +70,27 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, on
                   {index + 1}
                 </span>
                 <div className="flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="font-medium text-gray-800">{item.title}</h4>
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-medium text-gray-800">{item.title}</h4>
+                      {showRiskInfo && item.isRisk && (
+                        <span className={`px-2 py-0.5 text-xs rounded whitespace-nowrap ${riskLevelColors[item.riskLevel]}`}>
+                          风险:{riskLevelLabels[item.riskLevel]}
+                        </span>
+                      )}
+                    </div>
                     <span className={`px-2 py-0.5 text-xs rounded whitespace-nowrap ${priorityColors[item.priority]}`}>
                       {priorityLabels[item.priority]}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 mt-2">{item.description}</p>
+                  {showRiskInfo && item.followUpPlan && (
+                    <div className="mt-2 p-2 bg-amber-50 rounded border border-amber-200">
+                      <p className="text-xs text-amber-800">
+                        <span className="font-semibold">📋 跟进计划:</span> {item.followUpPlan}
+                      </p>
+                    </div>
+                  )}
                   <div className="flex gap-4 mt-3 text-xs text-gray-400">
                     <span className="flex items-center gap-1">
                       <span>👤</span>
@@ -82,11 +113,19 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, on
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50">
+        <div className={`p-6 border-b border-gray-200 flex items-center justify-between ${
+          report.hasUnresolvedRisk 
+            ? 'bg-gradient-to-r from-red-500 to-orange-500' 
+            : 'bg-gradient-to-r from-blue-50 to-indigo-50'
+        }`}>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <span className="text-2xl">📋</span>
+              <h2 className={`text-xl font-bold flex items-center gap-2 ${
+                report.hasUnresolvedRisk ? 'text-white' : 'text-gray-800'
+              }`}>
+                <span className="text-2xl">
+                  {report.hasUnresolvedRisk ? '🚨' : '📋'}
+                </span>
                 交班报详情
               </h2>
               {report.receiptStatus === ReportReceiptStatus.RECEIVED ? (
@@ -98,21 +137,34 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, on
                   ⏳ 待接收
                 </span>
               )}
+              {report.hasUnresolvedRisk && (
+                <span className="px-2 py-0.5 text-xs font-bold rounded border bg-white text-red-600 border-red-300 animate-pulse">
+                  ⚠️ 有未解除风险
+                </span>
+              )}
             </div>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className={`text-sm mt-1 ${report.hasUnresolvedRisk ? 'text-red-100' : 'text-gray-500'}`}>
               生成于 {formatDate(report.createdAt)}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white hover:shadow text-gray-500 hover:text-gray-700 transition-all"
+            className={`w-8 h-8 flex items-center justify-center rounded-full hover:shadow transition-all ${
+              report.hasUnresolvedRisk 
+                ? 'hover:bg-white hover:bg-opacity-20 text-white' 
+                : 'hover:bg-white text-gray-500 hover:text-gray-700'
+            }`}
           >
             ✕
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl p-6 text-white mb-6">
+          <div className={`rounded-xl p-6 mb-6 ${
+            report.hasUnresolvedRisk 
+              ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white' 
+              : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+          }`}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-2xl font-bold">{report.date}</h3>
@@ -145,7 +197,15 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, on
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className={`grid gap-4 mb-6 ${report.hasUnresolvedRisk ? 'grid-cols-4' : 'grid-cols-3'}`}>
+            {report.hasUnresolvedRisk && (
+              <div className="bg-red-50 rounded-xl p-4 text-center border border-red-200">
+                <div className="text-3xl font-bold text-red-600">
+                  {report.riskItems?.length || 0}
+                </div>
+                <div className="text-sm text-red-600 font-medium mt-1">未解除风险</div>
+              </div>
+            )}
             <div className="bg-green-50 rounded-xl p-4 text-center border border-green-100">
               <div className="text-3xl font-bold text-green-600">
                 {report.newItems.length}
@@ -173,6 +233,16 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, on
             </div>
             <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{report.summary}</p>
           </div>
+
+          {report.riskItems && report.riskItems.length > 0 && (
+            <ItemSection
+              title="⚠️ 未解除风险事项（需重点追踪）"
+              items={report.riskItems}
+              color="bg-red-100 text-red-700"
+              icon="⚠️"
+              showRiskInfo={true}
+            />
+          )}
 
           <ItemSection
             title="今日新增事项"

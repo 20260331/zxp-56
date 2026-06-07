@@ -7,8 +7,8 @@ import { ItemForm } from './components/ItemForm';
 import { ShiftReportModal } from './components/ShiftReportModal';
 import { ShiftReportHistory } from './components/ShiftReportHistory';
 import { ShiftReportDetail } from './components/ShiftReportDetail';
-import { HandoverItem, FilterType, ShiftReport, ShiftReportItem } from './types';
-import { getItems, addItem, updateItem, deleteItem, completeItem, getReports, addReport, deleteReport, confirmReport, ensureReportReceiptFields, getReportById } from './utils/storage';
+import { HandoverItem, FilterType, ShiftReport, ShiftReportItem, RiskStatus, RiskLevel } from './types';
+import { getItems, addItem, updateItem, deleteItem, completeItem, getReports, addReport, deleteReport, confirmReport, ensureAllMigrations, getReportById, resolveRisk } from './utils/storage';
 import { isToday, isOverdue } from './utils/dateUtils';
 
 function App() {
@@ -22,7 +22,7 @@ function App() {
   const [viewingReport, setViewingReport] = useState<ShiftReport | null>(null);
 
   useEffect(() => {
-    ensureReportReceiptFields();
+    ensureAllMigrations();
     setItems(getItems());
     setReports(getReports());
   }, []);
@@ -55,6 +55,8 @@ function App() {
     newItems: ShiftReportItem[];
     completedItems: ShiftReportItem[];
     pendingItems: ShiftReportItem[];
+    riskItems: ShiftReportItem[];
+    hasUnresolvedRisk: boolean;
   }) => {
     addReport(data);
     refreshData();
@@ -119,6 +121,13 @@ function App() {
     refreshData();
   };
 
+  const handleResolveRisk = (id: string) => {
+    const remarks = window.prompt('请输入风险解除说明（可选）：');
+    if (remarks === null) return;
+    resolveRisk(id, remarks || undefined);
+    refreshData();
+  };
+
   const handleDelete = (id: string) => {
     if (window.confirm('确定要删除这个交接事项吗？')) {
       deleteItem(id);
@@ -151,7 +160,26 @@ function App() {
     completed: items.filter(item => item.status === 'completed').length,
   };
 
+  const openRiskCount = items.filter(item => item.isRisk && item.riskStatus === RiskStatus.OPEN).length;
+  const criticalRiskCount = items.filter(item => 
+    item.isRisk && 
+    item.riskStatus === RiskStatus.OPEN && 
+    (item.riskLevel === RiskLevel.HIGH || item.riskLevel === RiskLevel.CRITICAL)
+  ).length;
+
   const sortedItems = [...filteredItems].sort((a, b) => {
+    const aOpenRisk = a.isRisk && a.riskStatus === RiskStatus.OPEN;
+    const bOpenRisk = b.isRisk && b.riskStatus === RiskStatus.OPEN;
+    if (aOpenRisk && !bOpenRisk) return -1;
+    if (!aOpenRisk && bOpenRisk) return 1;
+
+    if (aOpenRisk && bOpenRisk) {
+      const riskOrder = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
+      if (riskOrder[a.riskLevel] !== riskOrder[b.riskLevel]) {
+        return riskOrder[a.riskLevel] - riskOrder[b.riskLevel];
+      }
+    }
+
     const aOverdue = isOverdue(a.deadline, a.status);
     const bOverdue = isOverdue(b.deadline, b.status);
     if (aOverdue && !bOverdue) return -1;
@@ -171,6 +199,8 @@ function App() {
         onAddItem={handleAddItem} 
         onHandover={handleHandover}
         onViewHistory={handleViewHistory}
+        openRiskCount={openRiskCount}
+        criticalRiskCount={criticalRiskCount}
       />
 
       <main className="max-w-6xl mx-auto px-4 py-8">
@@ -205,6 +235,7 @@ function App() {
                   onComplete={handleComplete}
                   onEdit={handleEditItem}
                   onDelete={handleDelete}
+                  onResolveRisk={handleResolveRisk}
                 />
               ))}
             </div>

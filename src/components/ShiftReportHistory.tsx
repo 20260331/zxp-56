@@ -41,14 +41,35 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
     );
   };
 
+  const getRiskBadge = (report: ShiftReport) => {
+    if (report.hasUnresolvedRisk) {
+      return (
+        <span className="px-2 py-0.5 text-xs font-bold rounded border bg-red-600 text-white border-red-700 animate-pulse">
+          ⚠️ {report.riskItems?.length || 0} 项风险未解除
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-0.5 text-xs font-medium rounded border bg-green-100 text-green-700 border-green-300">
+        ✓ 无未解除风险
+      </span>
+    );
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <span className="text-2xl">📚</span>
-            历史交班报
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <span className="text-2xl">📚</span>
+              历史交班报
+            </h2>
+            <div className="flex items-center gap-1 text-xs text-gray-500">
+              <span className="inline-block w-3 h-3 rounded-full bg-red-600"></span>
+              <span>= 有未解除风险</span>
+            </div>
+          </div>
           <button
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
@@ -69,17 +90,24 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
               {reports.map((report) => (
                 <div
                   key={report.id}
-                  className="p-5 border border-gray-200 rounded-xl hover:shadow-md transition-all duration-200 bg-white"
+                  className={`p-5 border-2 rounded-xl hover:shadow-md transition-all duration-200 ${
+                    report.hasUnresolvedRisk 
+                      ? 'border-red-400 bg-red-50 hover:bg-red-100' 
+                      : 'border-gray-200 bg-white'
+                  }`}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="text-3xl">📋</div>
+                      <div className={`text-3xl ${report.hasUnresolvedRisk ? 'animate-pulse' : ''}`}>
+                        {report.hasUnresolvedRisk ? '🚨' : '📋'}
+                      </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold text-gray-800 text-lg">
                             {report.date} 交班报
                           </h3>
                           {getReceiptBadge(report)}
+                          {getRiskBadge(report)}
                         </div>
                         <div className="flex items-center gap-3 mt-1">
                           <span className={`px-2 py-0.5 text-xs font-medium rounded border ${shiftColors[report.shiftType]}`}>
@@ -101,7 +129,15 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className={`grid grid-cols-4 gap-3 mb-4 ${report.hasUnresolvedRisk ? '' : 'grid-cols-3'}`}>
+                    {report.hasUnresolvedRisk && (
+                      <div className="bg-red-100 rounded-lg p-3 text-center border border-red-200">
+                        <div className="text-2xl font-bold text-red-600">
+                          {report.riskItems?.length || 0}
+                        </div>
+                        <div className="text-xs text-red-600 font-medium">未解除风险</div>
+                      </div>
+                    )}
                     <div className="bg-green-50 rounded-lg p-3 text-center">
                       <div className="text-2xl font-bold text-green-600">
                         {report.newItems.length}
@@ -126,6 +162,28 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
                     <div className="text-xs font-medium text-gray-500 mb-1">交班小结</div>
                     <p className="text-sm text-gray-700 line-clamp-2">{report.summary}</p>
                   </div>
+
+                  {report.hasUnresolvedRisk && report.riskItems && report.riskItems.length > 0 && (
+                    <div className="mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
+                      <div className="text-xs font-semibold text-red-700 mb-2">⚠️ 未解除风险事项：</div>
+                      <div className="space-y-1">
+                        {report.riskItems.slice(0, 3).map(item => (
+                          <div key={item.id} className="text-xs text-red-700 flex items-start gap-1">
+                            <span>•</span>
+                            <span className="font-medium">{item.title}</span>
+                            {item.followUpPlan && (
+                              <span className="text-red-600"> - 跟进: {item.followUpPlan}</span>
+                            )}
+                          </div>
+                        ))}
+                        {report.riskItems.length > 3 && (
+                          <div className="text-xs text-red-600 mt-1">
+                            ...还有 {report.riskItems.length - 3} 项，请查看详情
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex gap-2">
                     <button

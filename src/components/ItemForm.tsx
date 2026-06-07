@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HandoverItem, HandoverStatus, Priority } from '../types';
+import { HandoverItem, HandoverStatus, Priority, RiskLevel, RiskStatus } from '../types';
 import { getTodayDate, toLocalISOString, fromLocalISOString } from '../utils/dateUtils';
 
 interface ItemFormProps {
@@ -17,7 +17,11 @@ export const ItemForm: React.FC<ItemFormProps> = ({ item, onSubmit, onCancel }) 
     assignee: '',
     reporter: '',
     deadline: `${getTodayDate()}T23:59`,
-    remarks: ''
+    remarks: '',
+    isRisk: false,
+    riskLevel: RiskLevel.NONE,
+    riskStatus: RiskStatus.RESOLVED,
+    followUpPlan: ''
   });
 
   useEffect(() => {
@@ -30,17 +34,36 @@ export const ItemForm: React.FC<ItemFormProps> = ({ item, onSubmit, onCancel }) 
         assignee: item.assignee,
         reporter: item.reporter,
         deadline: fromLocalISOString(item.deadline),
-        remarks: item.remarks || ''
+        remarks: item.remarks || '',
+        isRisk: item.isRisk,
+        riskLevel: item.riskLevel,
+        riskStatus: item.riskStatus,
+        followUpPlan: item.followUpPlan || ''
       });
     }
   }, [item]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
+    const submitData = {
       ...formData,
       deadline: toLocalISOString(formData.deadline)
-    });
+    };
+    if (!submitData.isRisk) {
+      submitData.riskLevel = RiskLevel.NONE;
+      submitData.riskStatus = RiskStatus.RESOLVED;
+      submitData.followUpPlan = '';
+    }
+    onSubmit(submitData);
+  };
+
+  const handleRiskToggle = (checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      isRisk: checked,
+      riskLevel: checked ? RiskLevel.MEDIUM : RiskLevel.NONE,
+      riskStatus: checked ? RiskStatus.OPEN : RiskStatus.RESOLVED
+    }));
   };
 
   return (
@@ -80,6 +103,67 @@ export const ItemForm: React.FC<ItemFormProps> = ({ item, onSubmit, onCancel }) 
               placeholder="请输入详细描述"
             />
           </div>
+
+          <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
+            <input
+              type="checkbox"
+              id="isRisk"
+              checked={formData.isRisk}
+              onChange={(e) => handleRiskToggle(e.target.checked)}
+              className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+            />
+            <label htmlFor="isRisk" className="text-sm font-medium text-red-700 cursor-pointer">
+              ⚠️ 标记为风险事项（需要交接班追踪）
+            </label>
+          </div>
+
+          {formData.isRisk && (
+            <div className="space-y-4 p-4 bg-red-50 rounded-lg border border-red-200">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-red-700 mb-1">
+                    风险等级 <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.riskLevel}
+                    onChange={(e) => setFormData({ ...formData, riskLevel: e.target.value as RiskLevel })}
+                    className="w-full px-3 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                  >
+                    <option value={RiskLevel.LOW}>低</option>
+                    <option value={RiskLevel.MEDIUM}>中</option>
+                    <option value={RiskLevel.HIGH}>高</option>
+                    <option value={RiskLevel.CRITICAL}>严重</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-red-700 mb-1">
+                    风险状态
+                  </label>
+                  <select
+                    value={formData.riskStatus}
+                    onChange={(e) => setFormData({ ...formData, riskStatus: e.target.value as RiskStatus })}
+                    className="w-full px-3 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                  >
+                    <option value={RiskStatus.OPEN}>未解除</option>
+                    <option value={RiskStatus.RESOLVED}>已解除</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-red-700 mb-1">
+                  跟进计划 <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  required={formData.isRisk}
+                  rows={3}
+                  value={formData.followUpPlan}
+                  onChange={(e) => setFormData({ ...formData, followUpPlan: e.target.value })}
+                  className="w-full px-3 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none resize-none"
+                  placeholder="请详细说明风险跟进计划、责任人、预计解除时间等..."
+                />
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>

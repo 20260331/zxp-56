@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { HandoverItem, HandoverStatus, ShiftReportItem } from '../types';
+import { HandoverItem, HandoverStatus, ShiftReportItem, RiskStatus } from '../types';
 import { getTodayDate, getCurrentShift, getShiftLabel, formatDate } from '../utils/dateUtils';
 import { convertToReportItem } from '../utils/storage';
 
@@ -15,6 +15,8 @@ interface ShiftReportModalProps {
     newItems: ShiftReportItem[];
     completedItems: ShiftReportItem[];
     pendingItems: ShiftReportItem[];
+    riskItems: ShiftReportItem[];
+    hasUnresolvedRisk: boolean;
   }) => void;
   onCancel: () => void;
 }
@@ -31,7 +33,7 @@ export const ShiftReportModal: React.FC<ShiftReportModalProps> = ({ items, onSub
     summary: ''
   });
 
-  const { newItems, completedItems, pendingItems } = useMemo(() => {
+  const { newItems, completedItems, pendingItems, riskItems } = useMemo(() => {
     const todayItems = items.filter(item => {
       const itemDate = new Date(item.createdAt).toISOString().split('T')[0];
       return itemDate === formData.date;
@@ -52,8 +54,14 @@ export const ShiftReportModal: React.FC<ShiftReportModalProps> = ({ items, onSub
       )
       .map(convertToReportItem);
 
-    return { newItems: news, completedItems: completed, pendingItems: pending };
+    const risks = items
+      .filter(item => item.isRisk && item.riskStatus === RiskStatus.OPEN)
+      .map(convertToReportItem);
+
+    return { newItems: news, completedItems: completed, pendingItems: pending, riskItems: risks };
   }, [items, formData.date]);
+
+  const hasUnresolvedRisk = riskItems.length > 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +70,9 @@ export const ShiftReportModal: React.FC<ShiftReportModalProps> = ({ items, onSub
       handoverTime: new Date().toISOString(),
       newItems,
       completedItems,
-      pendingItems
+      pendingItems,
+      riskItems,
+      hasUnresolvedRisk
     });
   };
 
@@ -80,11 +90,28 @@ export const ShiftReportModal: React.FC<ShiftReportModalProps> = ({ items, onSub
     urgent: '紧急'
   };
 
-  const ItemList = ({ title, items, color, icon }: { 
+  const riskLevelLabels: Record<string, string> = {
+    none: '无',
+    low: '低',
+    medium: '中',
+    high: '高',
+    critical: '严重'
+  };
+
+  const riskLevelColors: Record<string, string> = {
+    none: 'bg-gray-100 text-gray-600',
+    low: 'bg-yellow-100 text-yellow-700',
+    medium: 'bg-orange-100 text-orange-700',
+    high: 'bg-red-100 text-red-700',
+    critical: 'bg-red-600 text-white'
+  };
+
+  const ItemList = ({ title, items, color, icon, showRiskInfo = false }: { 
     title: string; 
     items: ShiftReportItem[]; 
     color: string;
     icon: string;
+    showRiskInfo?: boolean;
   }) => (
     <div className="mb-4">
       <div className={`flex items-center gap-2 mb-2 p-2 rounded ${color}`}>
@@ -102,8 +129,20 @@ export const ShiftReportModal: React.FC<ShiftReportModalProps> = ({ items, onSub
             <div key={item.id} className="p-3 bg-gray-50 rounded-lg border border-gray-100">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1">
-                  <h4 className="font-medium text-gray-800 text-sm">{item.title}</h4>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-medium text-gray-800 text-sm">{item.title}</h4>
+                    {showRiskInfo && item.isRisk && (
+                      <span className={`px-2 py-0.5 text-xs rounded whitespace-nowrap ${riskLevelColors[item.riskLevel]}`}>
+                        风险:{riskLevelLabels[item.riskLevel]}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500 mt-1 line-clamp-1">{item.description}</p>
+                  {showRiskInfo && item.followUpPlan && (
+                    <p className="text-xs text-amber-700 mt-1 bg-amber-50 p-1 rounded">
+                      📋 跟进: {item.followUpPlan}
+                    </p>
+                  )}
                 </div>
                 <span className={`px-2 py-0.5 text-xs rounded whitespace-nowrap ${priorityColors[item.priority]}`}>
                   {priorityLabels[item.priority]}
@@ -191,6 +230,23 @@ export const ShiftReportModal: React.FC<ShiftReportModalProps> = ({ items, onSub
 
           <div className="border-t border-gray-200 pt-4 mt-4">
             <h3 className="font-semibold text-gray-800 mb-4">当班摘要预览</h3>
+
+            {hasUnresolvedRisk && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+                <span className="text-xl">⚠️</span>
+                <span className="text-sm font-semibold text-red-700">
+                  本班存在 {riskItems.length} 项未解除风险，请务必在交班小结中说明！
+                </span>
+              </div>
+            )}
+
+            <ItemList 
+              title="未解除风险（单独追踪）" 
+              items={riskItems} 
+              color="bg-red-100 text-red-700" 
+              icon="⚠️"
+              showRiskInfo={true}
+            />
             
             <ItemList 
               title="今日新增" 
@@ -224,7 +280,7 @@ export const ShiftReportModal: React.FC<ShiftReportModalProps> = ({ items, onSub
               value={formData.summary}
               onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
-              placeholder="请简要说明当班情况、重点事项、注意事项等..."
+              placeholder={hasUnresolvedRisk ? "请详细说明风险事项的跟进计划和交接要求..." : "请简要说明当班情况、重点事项、注意事项等..."}
             />
           </div>
 

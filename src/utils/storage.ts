@@ -1,7 +1,27 @@
-import { HandoverItem, HandoverStatus, ShiftReport, ShiftReportItem, ReportReceiptStatus } from '../types';
+import { HandoverItem, HandoverStatus, ShiftReport, ShiftReportItem, ReportReceiptStatus, RiskLevel, RiskStatus } from '../types';
 
 const STORAGE_KEY = 'duty_handover_items';
 const REPORTS_STORAGE_KEY = 'duty_shift_reports';
+
+export const ensureItemRiskFields = (): void => {
+  const items = getItems();
+  let updated = false;
+  const migrated = items.map(item => {
+    if (item.isRisk === undefined) {
+      updated = true;
+      return {
+        ...item,
+        isRisk: false,
+        riskLevel: RiskLevel.NONE,
+        riskStatus: RiskStatus.RESOLVED
+      };
+    }
+    return item;
+  });
+  if (updated) {
+    saveItems(migrated);
+  }
+};
 
 export const getItems = (): HandoverItem[] => {
   const data = localStorage.getItem(STORAGE_KEY);
@@ -63,6 +83,73 @@ export const completeItem = (id: string, remarks?: string): HandoverItem | null 
   });
 };
 
+export const resolveRisk = (id: string, remarks?: string): HandoverItem | null => {
+  const items = getItems();
+  const existingItem = items.find(item => item.id === id);
+  if (!existingItem) return null;
+
+  const mergedRemarks = [existingItem.remarks, remarks]
+    .filter(Boolean)
+    .join('\n\n');
+
+  return updateItem(id, {
+    riskStatus: RiskStatus.RESOLVED,
+    riskResolvedAt: new Date().toISOString(),
+    remarks: mergedRemarks || undefined
+  });
+};
+
+export const getOpenRiskItems = (): HandoverItem[] => {
+  return getItems().filter(item => item.isRisk && item.riskStatus === RiskStatus.OPEN);
+};
+
+export const ensureReportRiskFields = (): void => {
+  const reports = getReports();
+  let updated = false;
+  const migrated = reports.map(report => {
+    if (report.riskItems === undefined || report.hasUnresolvedRisk === undefined) {
+      updated = true;
+      const riskItems = [
+        ...(report.newItems || []),
+        ...(report.pendingItems || [])
+      ].filter(item => item.isRisk && item.riskStatus === RiskStatus.OPEN);
+      return {
+        ...report,
+        riskItems,
+        hasUnresolvedRisk: riskItems.length > 0
+      };
+    }
+    return report;
+  });
+  if (updated) {
+    saveReports(migrated);
+  }
+};
+
+export const ensureReportReceiptFields = (): void => {
+  const reports = getReports();
+  let updated = false;
+  const migrated = reports.map(report => {
+    if (!report.receiptStatus) {
+      updated = true;
+      return {
+        ...report,
+        receiptStatus: ReportReceiptStatus.PENDING
+      };
+    }
+    return report;
+  });
+  if (updated) {
+    saveReports(migrated);
+  }
+};
+
+export const ensureAllMigrations = (): void => {
+  ensureItemRiskFields();
+  ensureReportReceiptFields();
+  ensureReportRiskFields();
+};
+
 export const getReports = (): ShiftReport[] => {
   const data = localStorage.getItem(REPORTS_STORAGE_KEY);
   return data ? JSON.parse(data) : [];
@@ -113,29 +200,15 @@ export const confirmReport = (id: string, receivedBy: string): ShiftReport | nul
   return reports[index];
 };
 
-export const ensureReportReceiptFields = (): void => {
-  const reports = getReports();
-  let updated = false;
-  const migrated = reports.map(report => {
-    if (!report.receiptStatus) {
-      updated = true;
-      return {
-        ...report,
-        receiptStatus: ReportReceiptStatus.PENDING
-      };
-    }
-    return report;
-  });
-  if (updated) {
-    saveReports(migrated);
-  }
-};
-
 export const convertToReportItem = (item: HandoverItem): ShiftReportItem => ({
   id: item.id,
   title: item.title,
   description: item.description,
   priority: item.priority,
   assignee: item.assignee,
-  deadline: item.deadline
+  deadline: item.deadline,
+  isRisk: item.isRisk,
+  riskLevel: item.riskLevel,
+  riskStatus: item.riskStatus,
+  followUpPlan: item.followUpPlan
 });

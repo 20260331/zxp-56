@@ -24,7 +24,15 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [receiverName, setReceiverName] = useState('');
   const [feedbackInputs, setFeedbackInputs] = useState<Record<string, string>>({});
-  const [feedbackByInputs, setFeedbackByInputs] = useState<Record<string, string>>({});
+  const [feedbackByInputs, setFeedbackByInputs] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    reports.forEach(report => {
+      (report.riskItems || []).forEach(item => {
+        initial[`${report.id}-${item.id}`] = report.nextOperator;
+      });
+    });
+    return initial;
+  });
   const [submittingItemId, setSubmittingItemId] = useState<string | null>(null);
   const [expandedFeedbackReportId, setExpandedFeedbackReportId] = useState<string | null>(null);
 
@@ -135,6 +143,9 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
   };
 
   const handleSubmitFeedback = (reportId: string, itemId: string) => {
+    const report = reports.find(r => r.id === reportId);
+    if (!report) return;
+    if (report.receiptStatus !== ReportReceiptStatus.RECEIVED) return;
     const key = `${reportId}-${itemId}`;
     const feedback = feedbackInputs[key] || '';
     const feedbackBy = feedbackByInputs[key] || '';
@@ -207,6 +218,7 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
                 const wasRiskButResolved = riskInfo.hasAnyRisk && riskInfo.allResolved;
                 const hasPendingFeedback = riskInfo.hasAnyRisk && riskInfo.pendingFeedbackCount > 0;
                 const isFeedbackExpanded = expandedFeedbackReportId === report.id;
+                const isReportReceived = report.receiptStatus === ReportReceiptStatus.RECEIVED;
                 
                 return (
                   <div
@@ -331,13 +343,18 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
                           }`}>
                             {stillOpen ? '⚠️ 未解除风险事项：' : '✓ 交班时风险（已全部解除）：'}
                           </div>
-                          {hasPendingFeedback && (
+                          {hasPendingFeedback && isReportReceived && (
                             <button
                               onClick={() => setExpandedFeedbackReportId(isFeedbackExpanded ? null : report.id)}
                               className="text-xs px-2 py-1 rounded border bg-white text-indigo-600 border-indigo-300 hover:bg-indigo-50 transition-colors font-medium"
                             >
                               {isFeedbackExpanded ? '收起反馈' : '展开快速反馈'}
                             </button>
+                          )}
+                          {hasPendingFeedback && !isReportReceived && (
+                            <span className="text-[11px] px-2 py-1 rounded border bg-gray-50 text-gray-500 border-gray-200">
+                              🔒 待接收后可反馈
+                            </span>
                           )}
                         </div>
                         <div className="space-y-2">
@@ -372,7 +389,7 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
                                       <p className="whitespace-pre-wrap mt-1 leading-relaxed">{item.riskFeedback}</p>
                                     </div>
                                   )}
-                                  {!item.hasFeedback && isFeedbackExpanded && (
+                                  {!item.hasFeedback && isFeedbackExpanded && isReportReceived && (
                                     <div className="mt-2 p-2 bg-amber-50 rounded border border-amber-200">
                                       <div className="grid grid-cols-[auto_1fr] gap-2 items-center mb-1">
                                         <label className="text-[11px] font-medium text-amber-700 whitespace-nowrap">
@@ -380,7 +397,7 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
                                         </label>
                                         <input
                                           type="text"
-                                          value={feedbackByInputs[`${report.id}-${item.id}`] ?? report.nextOperator}
+                                          value={feedbackByInputs[`${report.id}-${item.id}`] ?? ''}
                                           onChange={(e) => setFeedbackByInputs(prev => ({ ...prev, [`${report.id}-${item.id}`]: e.target.value }))}
                                           className="w-full px-2 py-1 text-[11px] border border-amber-300 rounded outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 bg-white"
                                           placeholder="反馈人姓名"
@@ -404,6 +421,14 @@ export const ShiftReportHistory: React.FC<ShiftReportHistoryProps> = ({
                                         >
                                           {submittingItemId === `${report.id}-${item.id}` ? '...' : '提交'}
                                         </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {!item.hasFeedback && isFeedbackExpanded && !isReportReceived && (
+                                    <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                                      <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                                        <span>🔒</span>
+                                        <span className="font-medium">待接班人确认接收后，方可填写处理意见</span>
                                       </div>
                                     </div>
                                   )}

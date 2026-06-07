@@ -14,8 +14,16 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, it
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [receiverName, setReceiverName] = useState(report.nextOperator);
   const [feedbackInputs, setFeedbackInputs] = useState<Record<string, string>>({});
-  const [feedbackByInputs, setFeedbackByInputs] = useState<Record<string, string>>({});
+  const [feedbackByInputs, setFeedbackByInputs] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    (report.riskItems || []).forEach(item => {
+      initial[item.id] = report.nextOperator;
+    });
+    return initial;
+  });
   const [submittingItemId, setSubmittingItemId] = useState<string | null>(null);
+
+  const isReportReceived = report.receiptStatus === ReportReceiptStatus.RECEIVED;
 
   const priorityColors: Record<string, string> = {
     low: 'bg-gray-100 text-gray-600',
@@ -98,8 +106,9 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, it
   const riskItemsWithLiveStatus = getRiskItemsWithLiveStatus();
 
   const handleSubmitFeedback = (itemId: string) => {
+    if (!isReportReceived) return;
     const feedback = feedbackInputs[itemId] || '';
-    const feedbackBy = feedbackByInputs[itemId] || report.nextOperator;
+    const feedbackBy = feedbackByInputs[itemId] || '';
     if (!feedback.trim()) return;
     if (!feedbackBy.trim()) return;
     setSubmittingItemId(itemId);
@@ -222,7 +231,7 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, it
                     </div>
                   )}
 
-                  {!item.hasFeedback && (
+                  {!item.hasFeedback && isReportReceived && (
                     <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
                       <div className="flex items-center gap-1 mb-2">
                         <span className="text-xs font-semibold text-amber-800 flex items-center gap-1">
@@ -235,7 +244,7 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, it
                       </label>
                       <input
                         type="text"
-                        value={feedbackByInputs[item.id] ?? report.nextOperator}
+                        value={feedbackByInputs[item.id] ?? ''}
                         onChange={(e) => setFeedbackByInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
                         className="w-full px-3 py-1.5 mb-2 text-sm border border-amber-300 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-white"
                         placeholder="请输入反馈人姓名"
@@ -258,6 +267,15 @@ export const ShiftReportDetail: React.FC<ShiftReportDetailProps> = ({ report, it
                         >
                           {submittingItemId === item.id ? '提交中...' : '提交反馈'}
                         </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!item.hasFeedback && !isReportReceived && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <span>🔒</span>
+                        <span className="font-medium">待接班人确认接收后，方可填写处理意见</span>
                       </div>
                     </div>
                   )}
